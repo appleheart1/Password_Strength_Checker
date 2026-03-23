@@ -1,7 +1,4 @@
 import re
-from cProfile import label
-from tabnanny import check
-
 
 def check_password(password):
     score = 0
@@ -40,6 +37,13 @@ def check_password(password):
         score += 2
     else:
         feedback.append('Add at least one special character ([!@#$%^&*(),.?":{}|<>])')
+
+    #Rule 6
+    if re.search(r'(.)\1{2,}', password):
+        score -=1
+        feedback.append('Avoid repeating characters (e.g. aaa or 111)')
+    elif len (password) >=8:
+        score += 1
 
     return score, feedback
 
@@ -104,32 +108,102 @@ def strength_label(score):
     else:
         return "Very Strong"
 
+def expand_birthday(birthday):
+    variations = [birthday]
+
+    #only process if it looks like a date with slashes e.g. 12/12/2000
+    if '/' in birthday:
+        parts = birthday.split('/')
+
+        if len(parts) == 3:
+            day, month, year = parts
+            short_year = year[-2:] #2006 -> 06
+
+            month_names = {
+                '01': 'january', '02': 'february', '03': 'march',
+                '04': 'april', '05': 'may', '06': 'june',
+                '07': 'july', '08': 'august', '09': 'september',
+                '10': 'october', '11': 'november', '12': 'december'
+            }
+
+            month_short = {
+                '01': 'jan', '02': 'feb', '03': 'mar',
+                '04': 'apr', '05': 'may', '06': 'jun',
+                '07': 'jul', '08': 'aug', '09': 'sep',
+                '10': 'oct', '11': 'nov', '12': 'dec'
+            }
+
+            variations += [
+                day, month, year, short_year,
+                day + month,
+                day + month + year,
+                day + month + short_year,
+                month + day + year,
+                year + month + day,
+                day + month_names.get(month, ''),
+                day + month_short.get(month, ''),
+                month_names.get(month, ''),
+                month_short.get(month, ''),
+            ]
+
+    return [v for v in variations if v]
+
+def contains_personal_info(password, personal_info):
+    matches = []
+    for info in personal_info:
+        if info and len(info) >= 4 and info in password.lower():
+            if info not in matches: #only add if not already in the list
+                matches.append(info)
+    if matches:
+        return True, matches
+    return False, []
+
+
 def main():
     print("=" * 40)
     print("    Password Strength Checker")
     print("=" * 40)
+    full_name = input("\nPlease enter your First and last name (first last)\n:").lower()
+    name_parts = full_name.split()
+    age = input("\nPlease enter your age\n:")
+    birthday = input("\nPlease enter your birthdate (DD/MM/YYYY)\n:")
+    birthday_variations = expand_birthday(birthday)
+    personal_info = name_parts + [age] + birthday_variations
 
-    password = input('\nPlease Enter your a password to check\n:')
+    while True:
+        password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
 
-    if is_common(password):
-        print("\n[!] WARNING: This is one of the most common passwords ever used.")
-        print("    It would be cracked instantly.")
+        if password.lower() == 'q':
+            print ("\nGoodbye!")
+            break
+        # check password against user's personal information
+        found, matched = contains_personal_info(password, personal_info)
 
-    else:
-        score, feedback = check_password(password)
-        label = strength_label(score)
-        time_to_crack = calculate_entropy(password)
+        if is_common(password):
+            print("\n[!] WARNING: This is one of the most common passwords ever used.")
+            print("    It would be cracked instantly.")
 
-        print(f"\nStrength     : {label}")
-        print(f"Score        : {score}/8")
-        print(f"Time to crack: {time_to_crack}")
-
-        if feedback:
-            print("\nSuggestions:")
-            for tip in feedback:
-                print(f"  -> {tip}")
         else:
-            print("\n✓ No issues found — great password!")
+            score, feedback = check_password(password)
+            label = strength_label(score)
+            time_to_crack = calculate_entropy(password)
+
+            print(f"\nStrength     : {label}")
+            print(f"Score        : {score}/8")
+            print(f"Time to crack: {time_to_crack}")
+
+            if found:
+                print(f"\n[!] WARNING: Your password contains personal information:")
+                print(f"    Found: {', '.join(matched)}")
+                print(f"    Attackers try names, birthdays and ages first!")
+            if feedback:
+                print("\nSuggestions:")
+                for tip in feedback:
+                    print(f"  -> {tip}")
+            if not found and not feedback:
+                print("\n✓ No issues found — great password!")
+
+        print("\n" + "-" * 40)
 
 if __name__ == "__main__":
     main()
