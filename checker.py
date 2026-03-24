@@ -1,4 +1,5 @@
 import re
+from datetime import date
 
 def check_password(password):
     score = 0
@@ -45,6 +46,8 @@ def check_password(password):
     elif len (password) >=8:
         score += 1
 
+    #prevent score from going negative
+    score = max(score, 0)
     return score, feedback
 
 def calculate_entropy(password):
@@ -73,17 +76,26 @@ def calculate_entropy(password):
     days = hours / 24
     years = days / 365
 
-    #**Come back to edit when year prints '1 years'**#
+
     if years >= 1_000_000_000:
         return "billions of years (practically uncrackable)"
-    elif years >= 1:
-        return f"{round(years):,} years"
-    elif days >= 1:
-        return f"{round(days):,} days"
-    elif hours >= 1:
-        return f"{round(hours):,} hours"
-    elif minutes >= 1:
-        return f"{round(minutes):,} minutes"
+
+    elif round(years) >= 1:
+        year_word = "year" if round(years) == 1 else "years"
+        return f"{round(years):,} {year_word}"
+
+    elif round(days) >= 1:
+        day_word = "day" if round(days) == 1 else "days"
+        return f"{round(days):,} {day_word}"
+
+    elif round(hours) >= 1:
+        hour_word = "hour" if round(hours) == 1 else "hours"
+        return f"{round(hours):,} {hour_word}"
+
+    elif round(minutes) >= 1:
+        minute_word = "minute" if round(minutes) == 1 else "minutes"
+        return f"{round(minutes):,} {minute_word}"
+
     else:
         return "less than a minute"
 
@@ -115,49 +127,79 @@ def expand_birthday(birthday):
     if '/' in birthday:
         parts = birthday.split('/')
 
-        if len(parts) == 3:
-            day, month, year = parts
-            short_year = year[-2:] #2006 -> 06
+    elif len(birthday) == 8 and birthday.isdigit():
+        parts = [birthday[0:2], birthday[2:4], birthday[4:8]]
 
-            month_names = {
-                '01': 'january', '02': 'february', '03': 'march',
-                '04': 'april', '05': 'may', '06': 'june',
-                '07': 'july', '08': 'august', '09': 'september',
-                '10': 'october', '11': 'november', '12': 'december'
-            }
+    else:
+        parts = []
 
-            month_short = {
-                '01': 'jan', '02': 'feb', '03': 'mar',
-                '04': 'apr', '05': 'may', '06': 'jun',
-                '07': 'jul', '08': 'aug', '09': 'sep',
-                '10': 'oct', '11': 'nov', '12': 'dec'
-            }
+    if len(parts) == 3:
+        day, month, year = parts
+        short_year = year[-2:] #2006 -> 06
 
-            variations += [
-                day, month, year, short_year,
-                day + month,
-                day + month + year,
-                day + month + short_year,
-                month + day + year,
-                year + month + day,
-                day + month_names.get(month, ''),
-                day + month_short.get(month, ''),
-                month_names.get(month, ''),
-                month_short.get(month, ''),
-            ]
+        month_names = {
+            '01': 'january', '02': 'february', '03': 'march',
+            '04': 'april', '05': 'may', '06': 'june',
+            '07': 'july', '08': 'august', '09': 'september',
+            '10': 'october', '11': 'november', '12': 'december'
+        }
 
+        month_short = {
+            '01': 'jan', '02': 'feb', '03': 'mar',
+            '04': 'apr', '05': 'may', '06': 'jun',
+            '07': 'jul', '08': 'aug', '09': 'sep',
+            '10': 'oct', '11': 'nov', '12': 'dec'
+        }
+
+        variations += [
+            day, month, year, short_year,
+            day + month,
+            day + month + year,
+            day + month + short_year,
+            month + day + year,
+            year + month + day,
+            day + month_names.get(month, ''),
+            day + month_short.get(month, ''),
+            month_names.get(month, ''),
+            month_short.get(month, ''),
+        ]
+    variations = list(dict.fromkeys(variations))
     return [v for v in variations if v]
 
 def contains_personal_info(password, personal_info):
     matches = []
     for info in personal_info:
-        if info and len(info) >= 4 and info in password.lower():
+        if info and len(info) >= 2 and info in password.lower():
             if info not in matches: #only add if not already in the list
                 matches.append(info)
     if matches:
         return True, matches
     return False, []
 
+def calculate_age(birthday):
+    today = date.today()
+
+    if '/' in birthday:
+        parts = birthday.split('/')
+        day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+    elif len(birthday) == 8 and birthday.isdigit():
+        day = int(birthday[0:2])
+        month = int(birthday[2:4])
+        year = int(birthday[4:8])
+    else:
+        return None
+
+    try:
+        dob = date(year, month, day)
+    except ValueError:
+        return None
+
+    age = today.year - dob.year
+
+    if (today.month, today.day) < (dob.month, dob.day):
+        age -= 1
+
+    return age
 
 def main():
     print("=" * 40)
@@ -165,10 +207,20 @@ def main():
     print("=" * 40)
     full_name = input("\nPlease enter your First and last name (first last)\n:").lower()
     name_parts = full_name.split()
-    age = input("\nPlease enter your age\n:")
-    birthday = input("\nPlease enter your birthdate (DD/MM/YYYY)\n:")
+
+    birthday = input("\nPlease enter your birthdate (DD/MM/YYYY or DDMMYYYY)\n:")
+
     birthday_variations = expand_birthday(birthday)
-    personal_info = name_parts + [age] + birthday_variations
+
+    age = calculate_age(birthday)
+    if age is not None:
+        age_str = str(age)
+    else:
+        age_str = input("\nCould not calculate age — please enter it manually\n:").lower()
+
+    personal_info = name_parts + [age_str] + birthday_variations
+
+
 
     while True:
         password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
