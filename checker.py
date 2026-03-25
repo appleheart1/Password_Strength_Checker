@@ -1,56 +1,52 @@
 import re
 from datetime import date
 
-def check_password(password):
+def Password_rules(password):
     score = 0
     feedback = []
 
-    #Rule 1
+    #length rules
     if len(password) >= 12:
         score += 2
-
     elif len(password) >= 8:
         score += 1
-
     else:
         feedback.append('Use at least 8 character (12+ is best)')
 
-    #Rule 2
+    #Case rules
     if re.search(r'[A-Z]', password):
         score += 1
     else:
         feedback.append('Add at least one uppercase letter (A-Z)')
-
-    #Rule 3
     if re.search(r'[a-z]', password):
         score += 1
     else:
         feedback.append('Add at least one lowercase letter (a-z)')
 
-    #Rule 4
+    #number rule
     if re.search(r'[0-9]', password):
         score += 1
     else:
         feedback.append('Add at least one number character (0-9)')
 
-    #Rule 5
+    #special character rule
     if re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         score += 2
     else:
         feedback.append('Add at least one special character ([!@#$%^&*(),.?":{}|<>])')
 
-    #Rule 6
+    #repeated char/num rule
     if re.search(r'(.)\1{2,}', password):
         score -=1
         feedback.append('Avoid repeating characters (e.g. aaa or 111)')
     elif len (password) >=8:
         score += 1
 
-    #prevent score from going negative
+    #no negative score
     score = max(score, 0)
     return score, feedback
 
-def calculate_entropy(password):
+def Calc_time_to_crack(password):
     pool = 0
 
     if re.search(r'[A-Z]', password):
@@ -99,7 +95,7 @@ def calculate_entropy(password):
     else:
         return "less than a minute"
 
-def is_common(password):
+def does_contain_common(password):
     try:
         with open("10k-most-common.txt", 'r') as f:
             common_pswd = f.read().split('\n')
@@ -110,7 +106,7 @@ def is_common(password):
     except FileNotFoundError:
         return False
 
-def strength_label(score):
+def password_score_strength(score):
     if score <= 1:
         return "Very Weak"
     elif score <= 3:
@@ -122,10 +118,10 @@ def strength_label(score):
     else:
         return "Very Strong"
 
-def expand_birthday(birthday):
+def birthday_format_handle(birthday):
     variations = [birthday]
 
-    #only process if it looks like a date with slashes e.g. 12/12/2000
+    #process '/' split such as 24/2/2004
     if '/' in birthday:
         parts = birthday.split('/')
 
@@ -168,11 +164,25 @@ def expand_birthday(birthday):
     variations = list(dict.fromkeys(variations))
     return [v for v in variations if v]
 
-def contains_personal_info(password, personal_info):
+def common_pattern_in_password(password):
+    sequence = ['qwerty', 'qwert', 'werty', 'asdfg', 'asdfgh',
+                'zxcvbnm', 'qwertyuiop', 'vbnhb', 'tress', 'drews', '123'
+                ,'12345', '123456', '23456', '2345', '234',]
+    matches = []
+    for i in sequence:
+        if i in password.lower():
+            matches.append(i)
+    if matches:
+        return True, matches
+
+    return False, []
+
+
+def PI_in_passwords(password, personal_info):
     matches = []
     for info in personal_info:
         if info and len(info) >= 2 and info in password.lower():
-            if info not in matches: #only add if not already in the list
+            if info not in matches: #only add if no in list allready
                 matches.append(info)
     if matches:
         return True, matches
@@ -212,7 +222,7 @@ def main():
 
     birthday = input("\nPlease enter your birthdate (DD/MM/YYYY or DDMMYYYY)\n:")
 
-    birthday_variations = expand_birthday(birthday)
+    birthday_variations = birthday_format_handle(birthday)
 
     age = calculate_age(birthday)
     if age is not None:
@@ -230,17 +240,19 @@ def main():
         if password.lower() == 'q':
             print ("\nGoodbye!")
             break
-        # check password against user's personal information
-        found, matched = contains_personal_info(password, personal_info)
+        # check agains user PI
+        found, matched = PI_in_passwords(password, personal_info)
+        keyboard_found, keyboard_matched = common_pattern_in_password(password)
 
-        if is_common(password):
+        if does_contain_common(password):
             print("\n[!] WARNING: This is one of the most common passwords ever used.")
             print("    It would be cracked instantly.")
 
         else:
-            score, feedback = check_password(password)
-            label = strength_label(score)
-            time_to_crack = calculate_entropy(password)
+            score, feedback = Password_rules(password)
+            label = password_score_strength(score)
+            time_to_crack = Calc_time_to_crack(password)
+
 
             print(f"\nStrength     : {label}")
             print(f"Score        : {score}/8")
@@ -254,7 +266,11 @@ def main():
                 print("\nSuggestions:")
                 for tip in feedback:
                     print(f"  -> {tip}")
-            if not found and not feedback:
+            if keyboard_found:
+                print(f"\n[!] WARNING: Your password contains a common sequence:")
+                print(f"    Found: {', '.join(keyboard_matched)}")
+                print(f"    Attackers try common sequences first")
+            if not found and not feedback and not keyboard_found:
                 print("\n✓ No issues found — great password!")
 
         print("\n" + "-" * 40)
