@@ -100,13 +100,15 @@ def calculate_entropy(password):
         return "less than a minute"
 
 def is_common(password):
-    common_passwords = [
-        "password", "123456", "qwerty", "letmein", "welcome",
-        "admin", "monkey", "dragon", "abc123", "iloveyou",
-        "sunshine", "password1", "football", "shadow", "123456789",
-        "12345678", "12345", "1234567", "1234567890", "000000"
-    ]
-    return password.lower() in common_passwords
+    try:
+        with open("10k-most-common.txt", 'r') as f:
+            common_pswd = f.read().split('\n')
+            for i in common_pswd:
+                if i.strip() == password.lower():
+                    return True
+            return False
+    except FileNotFoundError:
+        return False
 
 def strength_label(score):
     if score <= 1:
