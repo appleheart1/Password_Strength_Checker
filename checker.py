@@ -177,7 +177,6 @@ def common_pattern_in_password(password):
 
     return False, []
 
-
 def PI_in_passwords(password, personal_info):
     matches = []
     for info in personal_info:
@@ -213,6 +212,45 @@ def calculate_age(birthday):
 
     return age
 
+def Leet_Speak_Conversion(password):
+    leet_dict = {'4':'a', '@':'a', '^':'a', 'I3':'b', '{':'c', '[)':'d', '3':'e',
+                '£':'e', '€':'e', 'ph':'f', '9':'g', '#':'h', '1':'i', '!':'i', ']':'j'
+                , '|(':'k', '|_':'l', '/V':'n', '0':'o', 'Ø':'o', '|^':'p',
+                '0_':'q', 'I2':'r', '$':'s', "']['":'t','|_|':'u', 'µ':'u',
+                 'vv':'w', '><':'x', ')(':'x', '7':'y', '2':'z', '7_':'z'
+                }
+    converted = ""
+    i = 0
+    leet_pairs = []
+    seen = set()
+
+    while i < len(password):
+        two_char = password[i:i+2].lower()
+        one_char = password[i].lower()
+
+        if two_char in leet_dict:
+            replacement = leet_dict[two_char]
+            converted += replacement
+            if two_char not in seen:
+                leet_pairs.append((two_char, replacement))
+                seen.add(two_char)
+            i += 2
+        elif one_char in leet_dict:
+            replacement = leet_dict[one_char]
+            converted += replacement
+            if one_char not in seen:
+                leet_pairs.append((one_char,replacement))
+                seen.add(one_char)
+            i += 1
+        else:
+            converted += one_char
+            i += 1
+    #only mark if the converted version is a common password
+    is_leet_common = does_contain_common(converted)
+
+    return converted, leet_pairs, is_leet_common
+
+
 def main():
     print("=" * 40)
     print("    Password Strength Checker")
@@ -222,11 +260,13 @@ def main():
 
     birthday = input("\nPlease enter your birthdate (DD/MM/YYYY or DDMMYYYY)\n:")
 
+
     birthday_variations = birthday_format_handle(birthday)
 
     age = calculate_age(birthday)
     if age is not None:
         age_str = str(age)
+
     else:
         age_str = input("\nCould not calculate age — please enter it manually\n:").lower()
 
@@ -240,18 +280,27 @@ def main():
         if password.lower() == 'q':
             print ("\nGoodbye!")
             break
-        # check agains user PI
-        found, matched = PI_in_passwords(password, personal_info)
-        keyboard_found, keyboard_matched = common_pattern_in_password(password)
+        # check against user PI
 
         if does_contain_common(password):
             print("\n[!] WARNING: This is one of the most common passwords ever used.")
             print("    It would be cracked instantly.")
 
+
         else:
+            keyboard_found, keyboard_matched = common_pattern_in_password(password)
+            leet_password, leet_pairs, is_leet_common = Leet_Speak_Conversion(password)
+            found, matched = PI_in_passwords(password, personal_info)
             score, feedback = Password_rules(password)
+            score_deduct = 0
+            for i in matched:
+                score_deduct -= 1
+            score += score_deduct
+
             label = password_score_strength(score)
             time_to_crack = Calc_time_to_crack(password)
+
+
 
 
             print(f"\nStrength     : {label}")
@@ -260,7 +309,7 @@ def main():
 
             if found:
                 print(f"\n[!] WARNING: Your password contains personal information:")
-                print(f"    Found: {', '.join(matched)}")
+                print(f"    Found: '{"','".join(matched)}'", score_deduct, "point/s" )
                 print(f"    Attackers try names, birthdays and ages first!")
             if feedback:
                 print("\nSuggestions:")
@@ -270,6 +319,13 @@ def main():
                 print(f"\n[!] WARNING: Your password contains a common sequence:")
                 print(f"    Found: {', '.join(keyboard_matched)}")
                 print(f"    Attackers try common sequences first")
+
+            if is_leet_common and leet_pairs:
+                print(f"\n[!] WARNING: Your password contains a common leet speak/substitution:")
+                formatted = [f"{orig} = {conv}" for orig, conv in leet_pairs]
+                print(f"    Found: {', ' .join(formatted)}")
+                print(f"    Attackers use leet substitutions to guess you password")
+
             if not found and not feedback and not keyboard_found:
                 print("\n✓ No issues found — great password!")
 
