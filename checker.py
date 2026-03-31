@@ -1,5 +1,7 @@
 import re
 from datetime import date
+import hashlib
+import requests
 
 def Password_rules(password):
     score = 0
@@ -250,6 +252,35 @@ def Leet_Speak_Conversion(password):
 
     return converted, leet_pairs, is_leet_common
 
+def Have_I_Been_Pwned(password):
+
+    #password -> bytes -> hashed -> hex
+    bytes_pswd = password.encode('utf-8')
+    hashed_pswd = hashlib.sha1(bytes_pswd)
+    hex_out = hashed_pswd.hexdigest()
+
+    # take first 5 of hashed to pass to api (no full passwords leave program)
+    first_5 = hex_out[0:5]
+    first_5 = first_5.upper()
+    try:
+        #pass first 5 characters in hash to compare to leaked at url
+        full_url = 'https://api.pwnedpasswords.com/range/' + first_5
+        #get returned list of matching prefix and split by return
+        api_return = requests.get(full_url)
+        api_split = api_return.text.split('\n')
+    except:
+        print("\n[!] WARNING: Please check your internet connection,\nconnection couldn't be made so couldn't check if \npassword is breached against You've Been PWned databse")
+        return None
+
+    # compare affix to returned and find count of breach if any
+    for i in api_split:
+        if i.split(':')[0] == hex_out[5:].upper():
+            sides = i.split(':')
+            count = sides[1]
+            return int(count)
+
+    return 0
+
 
 def main():
     print("=" * 40)
@@ -282,54 +313,62 @@ def main():
             break
         # check against user PI
 
-        if does_contain_common(password):
-            print("\n[!] WARNING: This is one of the most common passwords ever used.")
-            print("    It would be cracked instantly.")
+        count = Have_I_Been_Pwned(password)
 
-
+        if count is not None and count > 0:
+            print(f"\n[!] WARNING: Your password was found in  {count} data breaches!" )
+            print(f"    Please choose a new password.")
         else:
-            keyboard_found, keyboard_matched = common_pattern_in_password(password)
-            leet_password, leet_pairs, is_leet_common = Leet_Speak_Conversion(password)
-            found, matched = PI_in_passwords(password, personal_info)
-            score, feedback = Password_rules(password)
-            score_deduct = 0
-            for i in matched:
-                score_deduct -= 1
-            score += score_deduct
 
-            label = password_score_strength(score)
-            time_to_crack = Calc_time_to_crack(password)
+            if does_contain_common(password):
+                print("\n[!] WARNING: This is one of the most common passwords ever used.")
+                print("    It would be cracked instantly.")
 
 
+            else:
+                keyboard_found, keyboard_matched = common_pattern_in_password(password)
+                leet_password, leet_pairs, is_leet_common = Leet_Speak_Conversion(password)
+                found, matched = PI_in_passwords(password, personal_info)
+                score, feedback = Password_rules(password)
+                score_deduct = 0
+
+                for i in matched:
+                    score_deduct -= 1
+                score += score_deduct
+
+                label = password_score_strength(score)
+                time_to_crack = Calc_time_to_crack(password)
 
 
-            print(f"\nStrength     : {label}")
-            print(f"Score        : {score}/8")
-            print(f"Time to crack: {time_to_crack}")
 
-            if found:
-                print(f"\n[!] WARNING: Your password contains personal information:")
-                print(f"    Found: '{"','".join(matched)}'", score_deduct, "point/s" )
-                print(f"    Attackers try names, birthdays and ages first!")
-            if feedback:
-                print("\nSuggestions:")
-                for tip in feedback:
-                    print(f"  -> {tip}")
-            if keyboard_found:
-                print(f"\n[!] WARNING: Your password contains a common sequence:")
-                print(f"    Found: {', '.join(keyboard_matched)}")
-                print(f"    Attackers try common sequences first")
 
-            if is_leet_common and leet_pairs:
-                print(f"\n[!] WARNING: Your password contains a common leet speak/substitution:")
-                formatted = [f"{orig} = {conv}" for orig, conv in leet_pairs]
-                print(f"    Found: {', ' .join(formatted)}")
-                print(f"    Attackers use leet substitutions to guess you password")
+                print(f"\nStrength     : {label}")
+                print(f"Score        : {score}/8")
+                print(f"Time to crack: {time_to_crack}")
 
-            if not found and not feedback and not keyboard_found:
-                print("\n✓ No issues found — great password!")
+                if found:
+                    print(f"\n[!] WARNING: Your password contains personal information:")
+                    print(f"    Found: '{"','".join(matched)}'", score_deduct, "point/s" )
+                    print(f"    Attackers try names, birthdays and ages first!")
+                if feedback:
+                    print("\nSuggestions:")
+                    for tip in feedback:
+                        print(f"  -> {tip}")
+                if keyboard_found:
+                    print(f"\n[!] WARNING: Your password contains a common sequence:")
+                    print(f"    Found: {', '.join(keyboard_matched)}")
+                    print(f"    Attackers try common sequences first")
 
-        print("\n" + "-" * 40)
+                if is_leet_common and leet_pairs:
+                    print(f"\n[!] WARNING: Your password contains a common leet speak/substitution:")
+                    formatted = [f"{orig} = {conv}" for orig, conv in leet_pairs]
+                    print(f"    Found: {', ' .join(formatted)}")
+                    print(f"    Attackers use leet substitutions to guess you password")
+
+                if not found and not feedback and not keyboard_found:
+                    print("\n✓ No issues found — great password!")
+
+            print("\n" + "-" * 40)
 
 if __name__ == "__main__":
     main()
