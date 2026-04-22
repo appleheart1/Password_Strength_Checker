@@ -2,8 +2,9 @@ import re
 from datetime import date
 import hashlib
 import requests
+import math
 
-def Password_rules(password):
+def password_rules(password):
     score = 0
     feedback = []
 
@@ -48,27 +49,28 @@ def Password_rules(password):
     score = max(score, 0)
     return score, feedback
 
-def Calc_time_to_crack(password):
+def calc_true_entropy(password):
+    if not password:
+        return 0
     pool = 0
-
-    if re.search(r'[A-Z]', password):
+    if any(c.islower() for c in password):
+        pool+= 26
+    if any(c.isupper() for c in password):
         pool += 26
-
-    if re.search(r'[a-z]', password):
-        pool += 26
-
-    if re.search(r'[0-9]', password):
+    if any(c.isdigit() for c in password):
         pool += 10
+    if any(not c.isalnum () for c in password):
+        pool += 20
 
-    if re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        pool += 32
+    E = len(password) * math.log2(pool)
 
-    if pool == 0:
-        return "instantly"
+    return round(E, 7)
 
-    combinations = pool ** len(password)
-    guesses_per_second = 100_000_000
-    seconds_to_crack = combinations / guesses_per_second
+def calc_time_to_crack(password):
+    entropy = calc_true_entropy(password)
+    total_combinations = 2**entropy
+    guesses_per_second = 100_000_000_000
+    seconds_to_crack = total_combinations/ (2*guesses_per_second)
     minutes = seconds_to_crack / 60
     hours = minutes / 60
     days = hours / 24
@@ -179,7 +181,7 @@ def common_pattern_in_password(password):
 
     return False, []
 
-def PI_in_passwords(password, personal_info):
+def pi_in_passwords(password, personal_info):
     matches = []
     for info in personal_info:
         if info and len(info) >= 2 and info in password.lower():
@@ -214,7 +216,7 @@ def calculate_age(birthday):
 
     return age
 
-def Leet_Speak_Conversion(password):
+def leet_speak_conversion(password):
     leet_dict = {'4':'a', '@':'a', '^':'a', 'I3':'b', '{':'c', '[)':'d', '3':'e',
                 '£':'e', '€':'e', 'ph':'f', '9':'g', '#':'h', '1':'i', '!':'i', ']':'j'
                 , '|(':'k', '|_':'l', '/V':'n', '0':'o', 'Ø':'o', '|^':'p',
@@ -252,7 +254,7 @@ def Leet_Speak_Conversion(password):
 
     return converted, leet_pairs, is_leet_common
 
-def Have_I_Been_Pwned(password):
+def have_i_been_pwned(password):
 
     #password -> bytes -> hashed -> hex
     bytes_pswd = password.encode('utf-8')
@@ -281,7 +283,6 @@ def Have_I_Been_Pwned(password):
 
     return 0
 
-
 def main():
     print("=" * 40)
     print("    Password Strength Checker")
@@ -308,16 +309,23 @@ def main():
     while True:
         password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
 
+        if password == ' ':
+            password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
+
         if password.lower() == 'q':
             print ("\nGoodbye!")
             break
-        # check against user PI
+        #checks with have i been Pwned database (without password leaving device)
 
-        count = Have_I_Been_Pwned(password)
+        count = have_i_been_pwned(password)
 
         if count is not None and count > 0:
             print(f"\n[!] WARNING: Your password was found in  {count} data breaches!" )
             print(f"    Please choose a new password.")
+
+
+
+        # check against user PI
         else:
 
             if does_contain_common(password):
@@ -327,9 +335,9 @@ def main():
 
             else:
                 keyboard_found, keyboard_matched = common_pattern_in_password(password)
-                leet_password, leet_pairs, is_leet_common = Leet_Speak_Conversion(password)
-                found, matched = PI_in_passwords(password, personal_info)
-                score, feedback = Password_rules(password)
+                leet_password, leet_pairs, is_leet_common = leet_speak_conversion(password)
+                found, matched = pi_in_passwords(password, personal_info)
+                score, feedback = password_rules(password)
                 score_deduct = 0
 
                 for i in matched:
@@ -337,14 +345,16 @@ def main():
                 score += score_deduct
 
                 label = password_score_strength(score)
-                time_to_crack = Calc_time_to_crack(password)
-
-
-
+                time_to_crack = calc_time_to_crack(password)
+                entropy = calc_true_entropy(password)
 
                 print(f"\nStrength     : {label}")
                 print(f"Score        : {score}/8")
+                print(f"Entropy is = {entropy}")
                 print(f"Time to crack: {time_to_crack}")
+
+                if count == 0:
+                    print("\nNot Found in any data breaches")
 
                 if found:
                     print(f"\n[!] WARNING: Your password contains personal information:")
@@ -368,7 +378,7 @@ def main():
                 if not found and not feedback and not keyboard_found:
                     print("\n✓ No issues found — great password!")
 
-            print("\n" + "-" * 40)
+                print("\n" + "-" * 40)
 
 if __name__ == "__main__":
     main()
