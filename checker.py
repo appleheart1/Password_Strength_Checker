@@ -5,6 +5,15 @@ import requests
 import math
 
 def password_rules(password):
+    """
+    Set rules for password and appropriate feedback
+
+    Checks the password against six scoring rules and awards points for length, uppercase,
+    lowercase digits, special characters and feedback (suggestions).
+
+    Returns score 0-8 and feedback String.
+    """
+
     score = 0
     feedback = []
 
@@ -50,6 +59,19 @@ def password_rules(password):
     return score, feedback
 
 def calc_true_entropy(password):
+    """
+    Calculates the true entropy of a password in bits.
+
+    Entropy measures how unpredictable/random a password is, the higher the bits the harder
+    it is to crack. Takes into account both length and variety of characters used.
+
+    Pool is the total number of possible characters the attacker has to guess from. For example
+    if your password only uses lowercase letters the pool is 26, but if it also uses digits the
+    pool grows to 36, making each harder to guess.
+
+    This function returns the entropy value in bits rounded to 7 decimal places as a float.
+    """
+
     if not password:
         return 0
     pool = 0
@@ -62,14 +84,25 @@ def calc_true_entropy(password):
     if any(not c.isalnum () for c in password):
         pool += 20
 
+    # Entropy formula: E = L x log2(P)
+    # L = password  length, P = character pool size
     E = len(password) * math.log2(pool)
 
     return round(E, 7)
 
 def calc_time_to_crack(password):
+    """
+    Calculates the time a modern computer would take to crack with entropy.
+
+    Converts into human-readable format (years, days and hours).The function returns the time
+    to crack in a human-readable format such as '24,745 years' or 'Billions of years (practically uncrackable)'.
+    """
+
     entropy = calc_true_entropy(password)
     total_combinations = 2**entropy
+    # guesses_per_second is 100,000,000,000 as is estimation based on modern GPU Tech
     guesses_per_second = 100_000_000_000
+    # seconds_to_crack is divided by two as attackers often find password halfway through not at end
     seconds_to_crack = total_combinations/ (2*guesses_per_second)
     minutes = seconds_to_crack / 60
     hours = minutes / 60
@@ -100,6 +133,13 @@ def calc_time_to_crack(password):
         return "less than a minute"
 
 def does_contain_common(password):
+    """
+    Compares password to a list of 10 thousand most common passwords
+
+    Uses the file '10k-most-common.txt' to compare to passed in password and returns any
+    matches that it finds regardless of case. Returns True if found or False if not (or file missing).
+    """
+
     try:
         with open("10k-most-common.txt", 'r') as f:
             common_pswd = f.read().split('\n')
@@ -107,10 +147,20 @@ def does_contain_common(password):
                 if i.strip() == password.lower():
                     return True
             return False
+    #Returns false instead of Error as if the file is missing it would crash the program so instead just skip.
     except FileNotFoundError:
         return False
 
 def password_score_strength(score):
+    """
+    Converts a numerical score to human-readable strength label.
+
+    Maps score ranges to labels:
+    0-1 = Very Weak, 2-3 = Weak, 4-5 = Fair, 6 = Strong, 7+ = Very Strong.
+
+    Returns a string label representing the password strength.
+    """
+
     if score <= 1:
         return "Very Weak"
     elif score <= 3:
@@ -123,6 +173,17 @@ def password_score_strength(score):
         return "Very Strong"
 
 def birthday_format_handle(birthday):
+    """
+    Processes user input into 'dd', 'mm', 'yyyy' chunks for later comparison.
+
+    Input form that are accepted are 'ddmmyyyy' or 'dd/mm/yyyy' either splitting by '/'
+    or assuming that the input will be split after position 2 and 4 if the user enters an
+    unexpected format it will ask instead for an age to work off of.
+
+    Returns a list of birthday variations as strings which contains all bite-sized parts to be compared
+    in PI detection.
+    """
+
     variations = [birthday]
 
     #process '/' split such as 24/2/2004
@@ -152,7 +213,7 @@ def birthday_format_handle(birthday):
             '07': 'jul', '08': 'aug', '09': 'sep',
             '10': 'oct', '11': 'nov', '12': 'dec'
         }
-
+        #Numerous variations/combinations as attackers try many common formats
         variations += [
             day, month, year, short_year,
             day + month,
@@ -165,10 +226,22 @@ def birthday_format_handle(birthday):
             month_names.get(month, ''),
             month_short.get(month, ''),
         ]
+    # Removes duplicates from list so score remains correct and less clustered feedback
     variations = list(dict.fromkeys(variations))
+    #Filter out empty strings as they could cause false matches in PI detection
     return [v for v in variations if v]
 
 def common_pattern_in_password(password):
+    """
+    Identifies if commonly used phrases are used in any part of the password.
+
+    Checks against list 'sequence' and adds any matches to 'matches' list.
+
+    Returns a Tuple (True, list of matches) if found  or (False, empty list)
+    if no matches.
+    """
+
+    #Very common phrases and keyboard sequences attacks try in dictionary attacks
     sequence = ['qwerty', 'qwert', 'werty', 'asdfg', 'asdfgh',
                 'zxcvbnm', 'qwertyuiop', 'vbnhb', 'tress', 'drews', '123'
                 ,'12345', '123456', '23456', '2345', '234',]
@@ -182,16 +255,37 @@ def common_pattern_in_password(password):
     return False, []
 
 def pi_in_passwords(password, personal_info):
+    """
+    Checks if personal info appears in the password.
+
+    Creates a list for potential matches then iterates through items in personal info and
+    compares if matches appear they are appended to 'matches' list. Only adds matches once
+    to ensure no duplicates.
+
+    Returns Tuple (True, list of matches) if found  or (False, empty list).
+    """
+
     matches = []
     for info in personal_info:
+        #Only checks for string containing 2 or more characters otherwise unuseful matches are made
         if info and len(info) >= 2 and info in password.lower():
-            if info not in matches: #only add if no in list allready
+            # Only appends if not in list already
+            if info not in matches:
                 matches.append(info)
     if matches:
         return True, matches
     return False, []
 
 def calculate_age(birthday):
+    """
+    Calculates age based on birthday.
+
+    From the format 'ddmmyyyy' or 'dd/mm/yyyy' age is calculated and returns none if entered
+    birthday format is not correct
+
+    Returns age as int
+
+    """
     today = date.today()
 
     if '/' in birthday:
@@ -211,12 +305,23 @@ def calculate_age(birthday):
 
     age = today.year - dob.year
 
+    # Checks if birthday has occurred yet this year and if not takes one off age
     if (today.month, today.day) < (dob.month, dob.day):
         age -= 1
 
     return age
 
 def leet_speak_conversion(password):
+    """
+    Converts leet speak substitutions in a password back to standard characters.
+
+    Leet speak replaces letters with visually similar characters (e.g. 3=e).
+    Attackers use these substitutes to bypass simple common password checks
+
+    Returns a Tuple (converted string, list of substituted pairs found, bool if converted
+    result is a common password).
+    """
+
     leet_dict = {'4':'a', '@':'a', '^':'a', 'I3':'b', '{':'c', '[)':'d', '3':'e',
                 '£':'e', '€':'e', 'ph':'f', '9':'g', '#':'h', '1':'i', '!':'i', ']':'j'
                 , '|(':'k', '|_':'l', '/V':'n', '0':'o', 'Ø':'o', '|^':'p',
@@ -226,12 +331,15 @@ def leet_speak_conversion(password):
     converted = ""
     i = 0
     leet_pairs = []
+    #Detects already detected substitutions and avoid duplicate warnings
     seen = set()
 
+    #Manual while loop instead of for due to two character substitutions need to skip by 2
     while i < len(password):
         two_char = password[i:i+2].lower()
         one_char = password[i].lower()
 
+        #Checks two char before one as substitutions like ph=f before matching single characters
         if two_char in leet_dict:
             replacement = leet_dict[two_char]
             converted += replacement
@@ -249,12 +357,23 @@ def leet_speak_conversion(password):
         else:
             converted += one_char
             i += 1
-    #only mark if the converted version is a common password
+    #Only mark if the converted version is a common password
     is_leet_common = does_contain_common(converted)
 
     return converted, leet_pairs, is_leet_common
 
 def have_i_been_pwned(password):
+    """
+    Checks against known password breaches via 'https://api.pwnedpasswords.com/range/'
+
+    Uses K-anonymity : Only sends 5 characters of the SHA-1 are sent to API (meaning the
+    full password never leaves the device)
+
+    The API returns all hashes starting with those 5 characters which are then compared
+    further locally to find full matching hex string then appends number of times breached.
+
+    Returns (number of breaches, 0 if clean, None if no internet connection)
+    """
 
     #password -> bytes -> hashed -> hex
     bytes_pswd = password.encode('utf-8')
@@ -284,15 +403,17 @@ def have_i_been_pwned(password):
     return 0
 
 def main():
+    #Sets up formatted header for readability
     print("=" * 40)
     print("    Password Strength Checker")
     print("=" * 40)
+
+    #Taking user input and assigning to relevant variables
     full_name = input("\nPlease enter your First and last name (first last)\n:").lower()
     name_parts = full_name.split()
-
     birthday = input("\nPlease enter your birthdate (DD/MM/YYYY or DDMMYYYY)\n:")
 
-
+    #Building personal info and formatting for processing
     birthday_variations = birthday_format_handle(birthday)
 
     age = calculate_age(birthday)
@@ -305,6 +426,7 @@ def main():
     personal_info = name_parts + [age_str] + birthday_variations
     personal_info = list(dict.fromkeys(personal_info))
 
+    #Main loop: repeatedly checks password until user quits
     while True:
         password = input('\nPlease Enter a password to check (or Q/q to quit)\n:')
 
@@ -315,25 +437,24 @@ def main():
         if password.lower() == 'q':
             print ("\nGoodbye!")
             break
-        #checks with have I been Pwned database (without password leaving device)
 
+        #Checks with have I been Pwned database (without password leaving device)
         count = have_i_been_pwned(password)
 
         if count is not None and count > 0:
-            print(f"\n[!] WARNING: Your password was found in  {count} data breaches!" )
+            print(f"\n[!] WARNING: Your password was found in {count} data breaches!" )
             print(f"    Please choose a new password.")
 
-
-
-        # check against user PI
         else:
 
+            #Checks if password is common
             if does_contain_common(password):
                 print("\n[!] WARNING: This is one of the most common passwords ever used.")
                 print("    It would be cracked instantly.")
 
-
+            # If passes common password and HIBP check
             else:
+                #calls necessary functions and assigns returned values to variables to print later if present
                 keyboard_found, keyboard_matched = common_pattern_in_password(password)
                 leet_password, leet_pairs, is_leet_common = leet_speak_conversion(password)
                 found, matched = pi_in_passwords(password, personal_info)
@@ -341,11 +462,12 @@ def main():
                 score, feedback = password_rules(password)
                 score_deduct = 0
 
-                for i in matched:
+                # Total Score calculations
+                for _ in matched:
                     score_deduct -= 1
                 pi_score_deduct = score_deduct
 
-                for i in leet_matched:
+                for _ in leet_matched:
                     score_deduct -= 1
                 leet_score_deduct = score_deduct - pi_score_deduct
 
@@ -363,6 +485,7 @@ def main():
                 time_to_crack = calc_time_to_crack(password)
                 entropy = calc_true_entropy(password)
 
+                #Output based of off analysis
                 print(f"\nStrength     : {label}")
                 print(f"Score        : {score}/8")
                 print(f"Entropy is = {entropy}")
