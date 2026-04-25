@@ -270,8 +270,8 @@ def have_i_been_pwned(password):
         #get returned list of matching prefix and split by return
         api_return = requests.get(full_url)
         api_split = api_return.text.split('\n')
-    except:
-        print("\n[!] WARNING: Please check your internet connection,\nconnection couldn't be made so couldn't check if \npassword is breached against You've Been PWned databse")
+    except requests.exceptions.RequestException:
+        print("\n[!] WARNING: Please check your internet connection,\nconnection couldn't be made so couldn't check if \npassword is breached against You've Been Pwned database")
         return None
 
     # compare affix to returned and find count of breach if any
@@ -337,12 +337,17 @@ def main():
                 keyboard_found, keyboard_matched = common_pattern_in_password(password)
                 leet_password, leet_pairs, is_leet_common = leet_speak_conversion(password)
                 found, matched = pi_in_passwords(password, personal_info)
+                leet_found, leet_matched = pi_in_passwords(leet_password, personal_info)
                 score, feedback = password_rules(password)
                 score_deduct = 0
 
                 for i in matched:
                     score_deduct -= 1
                 pi_score_deduct = score_deduct
+
+                for i in leet_matched:
+                    score_deduct -= 1
+                leet_score_deduct = score_deduct - pi_score_deduct
 
                 if len(keyboard_matched) == 1:
                     score_deduct -= 1
@@ -370,6 +375,12 @@ def main():
                     print(f"\n[!] WARNING: Your password contains personal information:")
                     print(f"    Found: '{"','".join(matched)}'", pi_score_deduct, "point/s" )
                     print(f"    Attackers try names, birthdays and ages first!")
+
+                if leet_found:
+                    print(f"\n[!] WARNING: Your password contains leet speak personal information:")
+                    print(f"    Found: '{"','".join(leet_matched)}'", leet_score_deduct, "point/s")
+                    print(f"    Attackers try names, birthdays and ages first!")
+
                 if feedback:
                     print("\nSuggestions:")
                     for tip in feedback:
@@ -385,7 +396,7 @@ def main():
                     print(f"    Found: {', ' .join(formatted)}")
                     print(f"    Attackers use leet substitutions to guess your password")
 
-                if not found and not feedback and not keyboard_found:
+                if not found and not feedback and not keyboard_found and not leet_found:
                     print("\n✓ No issues found — great password!")
 
         print("\n" + "-" * 40)
