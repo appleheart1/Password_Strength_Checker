@@ -303,19 +303,19 @@ def main():
         age_str = input("\nCould not calculate age — please enter it manually\n:").lower()
 
     personal_info = name_parts + [age_str] + birthday_variations
-
-
+    personal_info = list(dict.fromkeys(personal_info))
 
     while True:
-        password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
+        password = input('\nPlease Enter a password to check (or Q/q to quit)\n:')
 
-        if password == ' ':
-            password = input('\nPlease Enter your a password to check (or Q/q to quit)\n:')
+        if not password.strip():
+            print('\nNo password entered. Please try again. (or Q/q to quit)')
+            continue
 
         if password.lower() == 'q':
             print ("\nGoodbye!")
             break
-        #checks with have i been Pwned database (without password leaving device)
+        #checks with have I been Pwned database (without password leaving device)
 
         count = have_i_been_pwned(password)
 
@@ -342,7 +342,17 @@ def main():
 
                 for i in matched:
                     score_deduct -= 1
+                pi_score_deduct = score_deduct
+
+                if len(keyboard_matched) == 1:
+                    score_deduct -= 1
+                elif len(keyboard_matched) > 1:
+                    score_deduct -= 2
+
                 score += score_deduct
+                score =(max(score, 0))
+
+
 
                 label = password_score_strength(score)
                 time_to_crack = calc_time_to_crack(password)
@@ -358,7 +368,7 @@ def main():
 
                 if found:
                     print(f"\n[!] WARNING: Your password contains personal information:")
-                    print(f"    Found: '{"','".join(matched)}'", score_deduct, "point/s" )
+                    print(f"    Found: '{"','".join(matched)}'", pi_score_deduct, "point/s" )
                     print(f"    Attackers try names, birthdays and ages first!")
                 if feedback:
                     print("\nSuggestions:")
@@ -373,12 +383,12 @@ def main():
                     print(f"\n[!] WARNING: Your password contains a common leet speak/substitution:")
                     formatted = [f"{orig} = {conv}" for orig, conv in leet_pairs]
                     print(f"    Found: {', ' .join(formatted)}")
-                    print(f"    Attackers use leet substitutions to guess you password")
+                    print(f"    Attackers use leet substitutions to guess your password")
 
                 if not found and not feedback and not keyboard_found:
                     print("\n✓ No issues found — great password!")
 
-                print("\n" + "-" * 40)
+        print("\n" + "-" * 40)
 
 if __name__ == "__main__":
     main()
