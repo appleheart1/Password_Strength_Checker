@@ -459,6 +459,8 @@ def main():
                 leet_password, leet_pairs, is_leet_common = leet_speak_conversion(password)
                 found, matched = pi_in_passwords(password, personal_info)
                 leet_found, leet_matched = pi_in_passwords(leet_password, personal_info)
+                leet_matched = [item for item in leet_matched if item not in matched]
+                leet_found = len(leet_matched) > 0
                 score, feedback = password_rules(password)
                 score_deduct = 0
 
